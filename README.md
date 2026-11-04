@@ -51,9 +51,7 @@ Variáveis de ambiente opcionais (com seus padrões) estão em [`.env.example`](
 
 ## Onde a ponte acontece
 
-**MCP → A2A (pausa).** Quando a sala está ocupada, o resolver `escolha_de_sala` do servidor ([`servidor-mcp/servidor_mcp/servidor.py:74`](servidor-mcp/servidor_mcp/servidor.py#L74)) devolve um `Elicit`. O SDK termina a resposta com `resultType: input_required`, a elicitation e o `requestState` selado. No agente, `McpHost.chamar_tool` ([`agente/agente/mcp_host.py:210`](agente/agente/mcp_host.py#L210)) chama `ClientSession.call_tool(..., allow_input_required=True)`, recebe esse resultado sem que ninguém responda por ele e o converte em `EntradaNecessaria`. Em `Ponte._traduzir` ([`agente/agente/ponte.py:128`](agente/agente/ponte.py#L128)), o `input_required` vira estado nomeado da Task: a chave do `inputRequests`, o `requestState`, as opções do `enum` e os argumentos originais são guardados em `PausasRepository`, indexados pelo id da Task. O executor ([`agente/agente/executor.py:99`](agente/agente/executor.py#L99)) então coloca a Task em `TASK_STATE_INPUT_REQUIRED`, com a linha `alternativas: …`.
-
-**A2A → MCP (retomada).** O `SendMessage` de continuação traz `taskId` e `escolha=…`. O executor ([`agente/agente/executor.py:90`](agente/agente/executor.py#L90)) confere se a escolha pertence ao `enum` recebido; se não pertence, a Task continua pausada. Se pertence, `Ponte.retomar` ([`agente/agente/ponte.py:92`](agente/agente/ponte.py#L92)) devolve o `requestState` ao servidor ([`ponte.py:106-107`](agente/agente/ponte.py#L106)): um `tools/call` **novo**, com os mesmos argumentos, `inputResponses` na mesma chave (`accept` com a sala, ou `decline` para `escolha=recusar`) e o `requestState` ecoado byte a byte. O id JSON-RPC é novo porque o cliente do SDK aloca um id por request.
+A ponte fica em `agente/agente/ponte.py`, nos dois sentidos. **Ida:** quando a sala está ocupada, o resolver `escolha_de_sala` do servidor ([`servidor-mcp/servidor_mcp/servidor.py:74`](servidor-mcp/servidor_mcp/servidor.py#L74)) devolve um `Elicit`, e o SDK termina a resposta com `resultType: input_required`, a elicitation e o `requestState` selado. O agente chama `ClientSession.call_tool(..., allow_input_required=True)` e recebe esse resultado cru em `McpHost.chamar_tool` ([`agente/agente/mcp_host.py:210`](agente/agente/mcp_host.py#L210)). Em `Ponte._traduzir` ([`agente/agente/ponte.py:128`](agente/agente/ponte.py#L128)), o `input_required` vira estado nomeado da Task: a chave do `inputRequests`, o `requestState`, as opções do `enum` e os argumentos originais ficam guardados em `PausasRepository`, indexados pelo id da Task. O executor ([`agente/agente/executor.py:99`](agente/agente/executor.py#L99)) então coloca a Task em `TASK_STATE_INPUT_REQUIRED` com a linha `alternativas: …`. **Volta:** o `SendMessage` de continuação traz `taskId` e `escolha=…`; o executor ([`agente/agente/executor.py:90`](agente/agente/executor.py#L90)) confere se a escolha pertence ao `enum` recebido. Se pertence, `Ponte.retomar` ([`agente/agente/ponte.py:92`](agente/agente/ponte.py#L92)) devolve o `requestState` ao servidor ([`ponte.py:106-107`](agente/agente/ponte.py#L106)): um `tools/call` **novo**, com id JSON-RPC novo, os mesmos argumentos, `inputResponses` na mesma chave (`accept` com a sala, ou `decline` para `escolha=recusar`) e o `requestState` ecoado byte a byte.
 
 ## Decisões técnicas
 
@@ -97,10 +95,10 @@ Variáveis de ambiente opcionais (com seus padrões) estão em [`.env.example`](
 
 ## Saída do validador
 
-Última execução, com os dois processos recém-iniciados:
+Última execução, num `git clone` limpo deste repositório, seguindo só os comandos de "Como rodar" e com os dois processos recém-iniciados:
 
 ```
-trace-id desta execucao: 317ccf222daa2830f31979ae3c21c15b
+trace-id desta execucao: 9fdb5f09c854279bb66602264d9f445b
 procure esse valor no stderr do servidor MCP para conferir a propagacao do traceparent.
 
 PASS 01 tools/list traz as tres tools
